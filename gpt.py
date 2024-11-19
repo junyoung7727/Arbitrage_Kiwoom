@@ -89,7 +89,7 @@ class Prompt:
     def get_response(self):
 
         client = OpenAI(
-            api_key="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"
+            api_key="your_api_key"
         )
 
         response = client.chat.completions.create(
