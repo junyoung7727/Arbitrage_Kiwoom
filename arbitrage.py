@@ -27,7 +27,6 @@ class Kiwoom(QAxWidget):
         # Get spot-future pairs
         print('starting kiwoom')
         self.spot_future_pairs = self.get_all_futures_info()
-        print(self.spot_future_match)
         # Get dividend yields for all spot codes
 
         spot_codes = list(self.spot_future_pairs.keys())
@@ -78,7 +77,6 @@ class Kiwoom(QAxWidget):
         return self.dynamicCall("GetCommData(QString, QString, int, QString)", trcode, record, index, item)
 
     def on_receive_tr_data(self, screen_no, rqname, trcode, record_name, next, unused1, unused2, unused3, unused4):
-        print(rqname)
         if rqname == "opt50001_req_days_remaining":
             expiration_date = self.get_comm_data(trcode, record_name, 0, "잔존일수").strip()
             self.expiration_dates[self.current_future_code] = expiration_date
@@ -114,13 +112,12 @@ class Kiwoom(QAxWidget):
         self.tr_event_loop.exit()
 
     def _receive_real_data(self, code, real_type, real_data):
-        #print(f"Received real data: s_code={code}, real_type={real_type}")
         if real_type == "주식체결":
             current_price = abs(int(self.dynamicCall("GetCommRealData(QString, int)", code, 10).strip()))
             bid_price = abs(int(self.dynamicCall("GetCommRealData(QString, int)", code, 27).strip()))
             ask_price = abs(int(self.dynamicCall("GetCommRealData(QString, int)", code, 28).strip()))
             self.spot_prices[code] = {'bid': bid_price, 'ask': ask_price, 'current': current_price}
-
+            #print(self.spot_prices[code])
             # 매칭되는 선물 코드를 찾아서 차익거래 시도
             future_codes = [f_code for f_code, s_code in self.spot_future_match.items() if s_code == code]
             for future_code in future_codes:
@@ -131,14 +128,15 @@ class Kiwoom(QAxWidget):
             bid = abs(int(self.dynamicCall("GetCommRealData(QString, int)", code, 27).strip()))  # 최유리 매수 호가
 
             self.future_prices[code] = {'bid': bid, 'ask': ask}
-            print(f"종목 코드: {code}, 선물 시세 데이터: {self.future_prices[code]}")
+            # print(f"종목 코드: {code}, 선물 시세 데이터: {self.future_prices[code]}")
 
             # 매칭되는 현물 코드를 찾아서 차익거래 시도
             spot_code = self.spot_future_match.get(code)
+            #print(self.future_prices[code])
             if spot_code:
                 self.attempt_arbitrage(spot_code, code)
-            else:
-                print(f"No matching spot code for future code {code}")
+            # else:
+            #     print(f"No matching spot code for future code {code}")
 
     def attempt_arbitrage(self, spot_code, future_code):
         spot_price_info = self.spot_prices.get(spot_code[3:9])
@@ -149,7 +147,8 @@ class Kiwoom(QAxWidget):
             print(f"Data not available for spot {spot_code} or future {future_code}")
 
     def calculate_theoretical_future_price(self, spot_price, r, q, T):
-        return spot_price * (1 + (r - q) * T)
+        t_price = spot_price * (1 + (r - q) * T)
+        return t_price
 
     def get_future_interest_rate(self, future_code):
         return 0.035
@@ -175,9 +174,9 @@ class Kiwoom(QAxWidget):
         self.tr_event_loop = QEventLoop()
         self.tr_event_loop.exec_()
 
-    def execute_arbitrage(self, spot_code, future_code, spot_price_info, future_price_info):
-        spot_bid = spot_price_info['bid']  # 현물의 최우선 매수 호가
-        spot_ask = spot_price_info['ask']  # 현물의 최우선 매도 호가
+    def execute_arbitrage(self, spot_code, future_code, future_price_info):
+        spot_bid = self.spot_price_info['bid']  # 현물의 최우선 매수 호가
+        spot_ask = self.spot_price_info['ask']  # 현물의 최우선 매도 호가
 
         future_bid = future_price_info['bid']  # 선물의 최우선 매수 호가
         future_ask = future_price_info['ask']  # 선물의 최우선 매도 호가
@@ -262,15 +261,15 @@ class Kiwoom(QAxWidget):
         screen_no = "6001"
         codes_string = ';'.join(codes)
         self.dynamicCall("SetRealReg(QString, QString, QString, QString)", screen_no, '005930', fid_list, real_type)
-        print(f"실시간 데이터 등록 완료(주식): {codes_string}")
+        print(f"실시간 데이터 등록 완료(주식): 005930")
 
     def register_real_time_data_future(self, codes):
         fid_list = "10;27;28"  # 현재가;매수최우선호가;매도최우선호가
         real_type = "0"  # 0: 추가 등록
         screen_no = "6002"
         codes_string = ';'.join(codes)
-        self.dynamicCall("SetRealReg(QString, QString, QString, QString)", screen_no, '111VB000', fid_list, real_type)
-        print(f"실시간 데이터 등록 완료(선물): {codes_string}")
+        self.dynamicCall("SetRealReg(QString, QString, QString, QString)", screen_no, '111VC000', fid_list, real_type)
+        print(f"실시간 데이터 등록 완료(선물): 111VC000")
 
     def get_sfo_basis_asset_list(self):
         # 주식선물 기초자산 코드 리스트 가져오기
@@ -318,7 +317,7 @@ class Kiwoom(QAxWidget):
 
                     # spot_info와 매칭되는 기초자산 찾기
                     found = False  # 매칭이 되었는지 확인하는 플래그
-                    for spot_code, spot_name in spot_info:
+                    for i, (spot_code, spot_name) in enumerate(spot_info):
                         # 기초자산 이름이 일치하는지 확인 (대소문자 무시하고 공백 제거)
                         if spot_name.lower() == asset_name.lower():
                             # futures_info에 추가
@@ -329,13 +328,11 @@ class Kiwoom(QAxWidget):
                             }
                             self.spot_future_match[future_code] = spot_code
                             found = True  # 매칭되었음을 표시
-                            break  # 매칭이 되었으면 더 이상 asset_pair 반복문을 진행할 필요 없음
-
+                            break  # 매칭이 되면 spot_info 반복문만 벗어나도록
                     # 매칭이 되면 다음 item으로 넘어감
                     if found:
                         continue
         # 최종적으로 futures_info 반환
-        print(futures_info)
         return futures_info
 
 class KiwoomApp(QMainWindow):
@@ -369,14 +366,14 @@ class KiwoomApp(QMainWindow):
         try:
             # 테이블 행 수 설정
             self.table_widget.setRowCount(len(self.kiwoom.spot_future_pairs))
-            print(self.kiwoom.spot_future_pairs)
+            #print(self.kiwoom.spot_future_pairs)
             for row, (spot_code, info) in enumerate(self.kiwoom.spot_future_pairs.items()):
-                future_code = info['future_code']
-                spot_name = info['spot_name']
+                future_code = '111VC000'
+                spot_name = '삼성전자'
 
                 # 가격 정보 가져오기 (현물 및 선물)
-                spot_price_info = self.kiwoom.spot_prices.get(spot_code, {'bid': 0, 'ask': 0, 'current': 0})
-                future_price_info = self.kiwoom.future_prices.get(future_code, {'bid': 0, 'ask': 0, 'current': 0})
+                spot_price_info = self.kiwoom.spot_prices.get('005930', {'bid': 0, 'ask': 0, 'current': 0})
+                future_price_info = self.kiwoom.future_prices.get('111VC000', {'bid': 0, 'ask': 0, 'current': 0})
 
                 # days_to_expiration이 문자열일 경우 숫자로 변환
                 days_to_expiration = self.kiwoom.get_future_expiration_date(future_code)
@@ -393,11 +390,11 @@ class KiwoomApp(QMainWindow):
                 risk_free_rate = self.kiwoom.get_future_interest_rate(future_code)
 
                 # 값 출력 (디버깅용)
-                print(f"종목명: {spot_name}")
-                print(f"현물매도호가: {spot_price_info['ask']}, 현물매수호가: {spot_price_info['bid']}")
-                print(f"선물매도호가: {future_price_info['ask']}, 선물매수호가: {future_price_info['bid']}")
-                print(f"이자율: {risk_free_rate}, 배당수익률: {dividend_yield}")
-                print(f"잔존일수: {days_to_expiration}")
+                # print(f"종목명: 삼성전자")
+                # print(f"현물매도호가: {spot_price_info['ask']}, 현물매수호가: {spot_price_info['bid']}")
+                # print(f"선물매도호가: {future_price_info['ask']}, 선물매수호가: {future_price_info['bid']}")
+                # print(f"이자율: {risk_free_rate}, 배당수익률: {dividend_yield}")
+                # print(f"잔존일수: {days_to_expiration}")
 
                 # 이론 선물 가격 계산
                 T = days_to_expiration / 365.0

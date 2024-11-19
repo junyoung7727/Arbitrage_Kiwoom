@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/.idea/Kiwoom_Trader.iml" filepath="$PROJECT_DIR$/.idea/Kiwoom_Trader.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../Quant_Model/.idea/Quant_Model.iml" filepath="$PROJECT_DIR$/../Quant_Model/.idea/Quant_Model.iml" />
+    </modules>
+  </component>
+</project>
