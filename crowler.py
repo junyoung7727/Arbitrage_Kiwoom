@@ -5,13 +5,14 @@ from urllib.parse import quote
 def http_get(url):
     # HTTP GET 요청
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"
+        "User-Agent": "junghae2017@gmail.com"
     }
     response = requests.get(url, headers=headers)
     return response
 
 
 def crowl(name):
+    print("한경 뉴스 수집중...")
     news_dict = {}
     # 한경 뉴스 검색 URL
     url = f"https://search.hankyung.com/search/news?query={quote(name)}&sort=DATE%2FDESC%2CRANK%2FDESC&period=ALL&area=title&exact=&include=&except="
